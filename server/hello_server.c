@@ -5,9 +5,22 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <ctype.h>
+#include <signal.h>
 #include "hello_server.h"
 
 #define PORT 8080
+
+int server_socket;
+
+void handle_signal(int signal)
+{
+    if (signal == SIGINT)
+    {
+        fprintf(stderr, "Shutting down server...\n");
+        close(server_socket);
+        exit(EXIT_SUCCESS);
+    }
+}
 
 void trim(char *str)
 {
@@ -59,19 +72,32 @@ void handle_client(int client_socket)
         buffer[bytes_read] = '\0';
         trim(buffer);
         fprintf(stdout, "Received: %s\n", buffer);
-        char response[1024];
-        snprintf(response, 1024, "Hello %.100s!\n", buffer);
-        printf("Responding: %s\n", response);
-        send(client_socket, response, strlen(response), 0);
+
+        // Open a stream for the client socket
+        FILE *client_stream = fdopen(client_socket, "w");
+        if (client_stream == NULL)
+        {
+            perror("fdopen");
+            close(client_socket);
+            return;
+        }
+
+        fprintf(client_stream, "Hello %s!\n", buffer);
+        fflush(client_stream); // Ensure the message is sent immediately
+
+        printf("Responding: Hello %.100s!\n", buffer);
+        fclose(client_stream); // This will also close the client socket
     }
     printf("Closing connection to client\n");
-    close(client_socket);
 }
 
 void hello_server()
 {
+    // Register signal handler
+    signal(SIGINT, handle_signal);
+
     // Create socket
-    int server_socket = socket(AF_INET, SOCK_STREAM, 0);
+    server_socket = socket(AF_INET, SOCK_STREAM, 0);
     if (server_socket == -1)
     {
         perror("socket");
