@@ -1,0 +1,12 @@
+{
+    "C_Cpp.default.compilerPath": "/usr/bin/gcc",
+    "files.associations": {
+        "prompt.h": "c",
+        "fibonacci.h": "c",
+        "errno.h": "c",
+        "stdio.h": "c",
+        "stdlib.h": "c",
+        "string.h": "c",
+        "hello_server.h": "c"
+    }
+}
