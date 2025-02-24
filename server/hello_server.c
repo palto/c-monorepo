@@ -4,6 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <ctype.h>
 #include "hello_server.h"
 
 #define PORT 8080
@@ -116,4 +117,9 @@ void hello_server()
 
         handle_client(client_socket); // Handle communication
     }
+}
+
+int main()
+{
+    hello_server();
 }

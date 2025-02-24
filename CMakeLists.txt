@@ -3,7 +3,5 @@ project(hello VERSION 0.1.0 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 99)
 
-file(GLOB SOURCES "*.c")
-
-add_executable(hello ${SOURCES})
-
+add_executable(fibonacci fibonacci/fibonacci.c fibonacci/prompt.c)
+add_executable(server server/hello_server.c)

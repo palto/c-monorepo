@@ -68,5 +68,10 @@ void fibonacci_app() {
     }
 }
 
+int main()
+{
+    fibonacci_app();
+}
+
 
 
