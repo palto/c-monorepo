@@ -7,6 +7,7 @@
 #include <ctype.h>
 #include <signal.h>
 #include "hello_server.h"
+#include "trim.h"
 
 #define PORT 8080
 
@@ -19,41 +20,6 @@ void handle_signal(int signal)
         fprintf(stderr, "Shutting down server...\n");
         close(server_socket);
         exit(EXIT_SUCCESS);
-    }
-}
-
-void trim(char *str)
-{
-    char *start = str;
-    char *end;
-
-    // Trim leading whitespace
-    while (*start && isspace((unsigned char)*start))
-    {
-        start++;
-    }
-
-    // If the string is all whitespace
-    if (*start == '\0')
-    {
-        *str = '\0';
-        return;
-    }
-
-    // Trim trailing whitespace
-    end = start + strlen(start) - 1;
-    while (end > start && isspace((unsigned char)*end))
-    {
-        end--;
-    }
-
-    // Write new null terminator
-    *(end + 1) = '\0';
-
-    // Shift trimmed string to the original buffer
-    if (start != str)
-    {
-        memmove(str, start, end - start + 2);
     }
 }
 
