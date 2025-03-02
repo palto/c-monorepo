@@ -1,3 +1,4 @@
+#include <sqlite3.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -11,16 +12,47 @@
 #define PORT 8080
 
 int server_socket;
+sqlite3 *db; // SQLite database handle
+
 
 // Function declarations
 static void handle_signal(int signal);
 static void handle_client(int client_socket);
 static void hello_server(void);
+static void initiate_database(void);
+static int store_message(const char *message);
 
 int main()
 {
+    initiate_database();
     hello_server();
+    sqlite3_close(db);
     return 0;
+}
+
+static void initiate_database(void)
+{
+    // Open database
+    if (sqlite3_open("server_messages.db", &db) != SQLITE_OK)
+    {
+        fprintf(stderr, "Unable to open database: %s\n", sqlite3_errmsg(db));
+        exit(EXIT_FAILURE);
+    }
+
+    // Create table if it doesn't exist
+    const char *sql = "CREATE TABLE IF NOT EXISTS messages ("
+                      "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                      "message TEXT NOT NULL, "
+                      "timestamp DATETIME DEFAULT CURRENT_TIMESTAMP);";
+
+    char *errmsg = NULL;
+    if (sqlite3_exec(db, sql, NULL, NULL, &errmsg) != SQLITE_OK)
+    {
+        fprintf(stderr, "Unable to create table: %s\n", errmsg);
+        sqlite3_free(errmsg);
+        sqlite3_close(db);
+        exit(EXIT_FAILURE);
+    }
 }
 
 static void hello_server(void)
@@ -37,13 +69,14 @@ static void hello_server(void)
     }
 
     struct sockaddr_in server_addr =
-        {
-            .sin_family = AF_INET,
-            .sin_addr.s_addr = INADDR_ANY,
-            .sin_port = htons(PORT)};
+    {
+        .sin_family = AF_INET,
+        .sin_addr.s_addr = INADDR_ANY,
+        .sin_port = htons(PORT)
+    };
 
     // Bind socket
-    if (bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+    if (bind(server_socket, (struct sockaddr*)&server_addr, sizeof(server_addr)) < 0)
     {
         perror("bind");
         exit(EXIT_FAILURE);
@@ -66,7 +99,7 @@ static void hello_server(void)
 
         printf("Waiting for connections\n");
 
-        int client_socket = accept(server_socket, (struct sockaddr *)&client_addr, &client_addr_len);
+        const int client_socket = accept(server_socket, (struct sockaddr*)&client_addr, &client_addr_len);
         if (client_socket < 0)
         {
             perror("accept");
@@ -81,7 +114,7 @@ static void handle_client(int client_socket)
 {
     printf("Client connected\n");
     char buffer[1024];
-    int bytes_read = recv(client_socket, buffer, 1024 - 1, 0);
+    ssize_t bytes_read = recv(client_socket, buffer, 1024 - 1, 0);
 
     if (bytes_read < 0)
     {
@@ -93,8 +126,13 @@ static void handle_client(int client_socket)
         trim(buffer);
         fprintf(stdout, "Received: %s\n", buffer);
 
+        if (store_message(buffer) != 0 )
+        {
+            fprintf(stderr, "Failed to store message\n");
+        }
+
         // Open a stream for the client socket
-        FILE *client_stream = fdopen(client_socket, "w");
+        FILE* client_stream = fdopen(client_socket, "w");
         if (client_stream == NULL)
         {
             perror("fdopen");
@@ -109,6 +147,41 @@ static void handle_client(int client_socket)
         fclose(client_stream); // This will also close the client socket
     }
     printf("Closing connection to client\n");
+}
+
+static int store_message(const char *message)
+{
+    // Save the message into the SQLite database
+    sqlite3_stmt *stmt;
+    const char *sql = "INSERT INTO messages (message) VALUES (?);";
+
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK)
+    {
+        fprintf(stderr, "Failed to prepare statement: %s\n", sqlite3_errmsg(db));
+        return -1;
+    }
+
+    // Bind the received message to the prepared statement
+    if (sqlite3_bind_text(stmt, 1, message, -1, SQLITE_TRANSIENT) != SQLITE_OK)
+    {
+        fprintf(stderr, "Failed to bind message: %s\n", sqlite3_errmsg(db));
+        sqlite3_finalize(stmt);
+        return -1;
+    }
+
+    // Execute the statement
+    if (sqlite3_step(stmt) != SQLITE_DONE)
+    {
+        fprintf(stderr, "Failed to insert message: %s\n", sqlite3_errmsg(db));
+    }
+    else
+    {
+        printf("Message saved to database.\n");
+    }
+
+    sqlite3_finalize(stmt); // Cleanup
+    return 0;
+
 }
 
 static void handle_signal(int signal)
